@@ -6,24 +6,12 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <errno.h>
 #include <string.h>
 
-// TCP port
-#define PORT "3490"
+#include "server.h"
 
 // Number of pending connections
 #define BACKLOG 10
-
-static void
-sigchld_handler(int s)
-{
-    int saved_errno = errno;
-    while (waitpid(-1, NULL, WNOHANG) > 0);
-    errno = saved_errno;
-}
 
 static void *
 get_in_addr(struct sockaddr *sa)
@@ -35,7 +23,7 @@ get_in_addr(struct sockaddr *sa)
 }
 
 int
-server_bind()
+server_bind(char *service)
 {
     struct addrinfo hints = {
         .ai_family   = AF_UNSPEC,
@@ -43,7 +31,7 @@ server_bind()
         .ai_flags    = AI_PASSIVE,
     }, *servinfo, *p;
 
-    int err = getaddrinfo(NULL, PORT, &hints, &servinfo);
+    int err = getaddrinfo(NULL, service, &hints, &servinfo);
     if (err != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
@@ -89,7 +77,7 @@ server_bind()
     return sockfd;
 }
 
-static void
+void
 server_listen(int sockfd)
 {
     if (listen(sockfd, BACKLOG) == -1)
@@ -101,24 +89,7 @@ server_listen(int sockfd)
     printf("server: waiting for connections...\n");
 }
 
-static void
-handle_sigchld(void (*handler)(int))
-{
-    struct sigaction sa = {
-        .sa_handler = handler,
-        .sa_flags   = SA_RESTART,
-    };
-
-    sigemptyset(&sa.sa_mask);
-
-    if (sigaction(SIGCHLD, &sa, NULL) == -1)
-    {
-        perror("sigaction");
-        exit(1);
-    }
-}
-
-static void
+void
 server_handle(int fd)
 {
     char *response = "HTTP/1.1 200 OK\n"
@@ -132,7 +103,7 @@ server_handle(int fd)
     close(fd);
 }
 
-static void
+void
 server_loop(int sockfd)
 {
     struct sockaddr_storage their_addr;
@@ -165,14 +136,3 @@ server_loop(int sockfd)
     }
 }
 
-int
-main(int argc, char *argv[])
-{
-    handle_sigchld(sigchld_handler);
-
-    int sockfd = server_bind();
-    server_listen(sockfd);
-    server_loop(sockfd);
-
-    return 0;
-}
