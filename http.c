@@ -35,7 +35,7 @@ get_in_addr(struct sockaddr *sa)
 }
 
 int
-main(int argc, char *argv[])
+server_bind()
 {
     struct addrinfo hints = {
         .ai_family   = AF_UNSPEC,
@@ -47,7 +47,7 @@ main(int argc, char *argv[])
     if (err != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
-        return 1;
+        exit(1);
     }
 
     int sockfd;
@@ -64,7 +64,7 @@ main(int argc, char *argv[])
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
         {
             perror("setsockopt");
-            return 1;
+            exit(1);
         }
 
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
@@ -83,17 +83,29 @@ main(int argc, char *argv[])
     if (NULL == p)
     {
         fprintf(stderr, "server: failed to bind\n");
-        return 1;
+        exit(1);
     }
 
+    return sockfd;
+}
+
+static void
+server_listen(int sockfd)
+{
     if (listen(sockfd, BACKLOG) == -1)
     {
         perror("listen");
-        return 1;
+        exit(1);
     }
 
+    printf("server: waiting for connections...\n");
+}
+
+static void
+handle_sigchld(void (*handler)(int))
+{
     struct sigaction sa = {
-        .sa_handler = sigchld_handler,
+        .sa_handler = handler,
         .sa_flags   = SA_RESTART,
     };
 
@@ -102,17 +114,34 @@ main(int argc, char *argv[])
     if (sigaction(SIGCHLD, &sa, NULL) == -1)
     {
         perror("sigaction");
-        return 1;
+        exit(1);
     }
+}
 
-    printf("server: waiting for connections...\n");
+static void
+server_handle(int fd)
+{
+    char *response = "HTTP/1.1 200 OK\n"
+                     "Content-Length: 40\n"
+                     "Connection: close\n\n"
+                     "<html><body>Hello, world!</body></html>\n";
 
+    if (send(fd, response, strlen(response), 0) == -1)
+        perror("send");
+
+    close(fd);
+}
+
+static void
+server_loop(int sockfd)
+{
     struct sockaddr_storage their_addr;
+    socklen_t sin_size = sizeof their_addr;
+
     while (1)
     {
-        socklen_t sin_size = sizeof their_addr;
-        int new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size);
-        if (new_fd == -1)
+        int conn_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size);
+        if (conn_fd == -1)
         {
             perror("accept");
             continue;
@@ -120,26 +149,30 @@ main(int argc, char *argv[])
 
         char s[INET6_ADDRSTRLEN];
         inet_ntop(their_addr.ss_family,
-            get_in_addr((struct sockaddr *) &their_addr), s, sizeof s);
+                get_in_addr((struct sockaddr *) &their_addr), s, sizeof s);
         printf("server: got connection from %s\n", s);
 
-        // Is this the child process?
         if (!fork())
         {
             // Child doesn't need listener socket.
             close(sockfd);
-
-            char *response = "HTTP/1.1 200 OK\nContent-Length: 40\nConnection: close\n\n<html><body>Hello, world!</body></html>\n";
-            if (send(new_fd, response, strlen(response), 0) == -1)
-                perror("send");
-
-            close(new_fd);
-            return 0;
+            server_handle(conn_fd);
+            break;
         }
 
-        // Parent doesn't need connected socket.
-        close(new_fd);
+        // Parent doesn't need the connection socket.
+        close(conn_fd);
     }
+}
+
+int
+main(int argc, char *argv[])
+{
+    handle_sigchld(sigchld_handler);
+
+    int sockfd = server_bind();
+    server_listen(sockfd);
+    server_loop(sockfd);
 
     return 0;
 }
