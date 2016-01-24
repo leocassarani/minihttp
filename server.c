@@ -141,7 +141,7 @@ server_handle(int fd)
     }
 
     http_request_parse(buf, len, &req);
-    printf("handler: %s %s %s\n", req.method, req.path, req.version);
+    printf("handler: %s %s\n", req.method, req.path);
 
     char *response = "HTTP/1.1 200 OK\n"
                      "Content-Length: 40\n"
