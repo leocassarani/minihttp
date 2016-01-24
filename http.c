@@ -60,4 +60,14 @@ http_request_free(struct http_request *req)
     free(req->method);
     free(req->path);
     free(req->version);
+
+    struct http_header *header = req->headers;
+    while (header != NULL)
+    {
+        struct http_header *next = header->next;
+        free(header->name);
+        free(header->value);
+        free(header);
+        header = next;
+    }
 }
