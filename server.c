@@ -143,9 +143,10 @@ server_handle(int fd)
     http_request_parse(buf, len, &req);
     printf("handler: %s %s\n", req.method, req.path);
 
-    char *response = "HTTP/1.1 200 OK\n"
-                     "Content-Length: 40\n"
-                     "Connection: close\n\n"
+    char *response = "HTTP/1.1 200 OK\r\n"
+                     "Content-Length: 40\r\n"
+                     "Connection: close\r\n"
+                     "\r\n"
                      "<html><body>Hello, world!</body></html>\n";
 
     if (send(fd, response, strlen(response), 0) == -1)
