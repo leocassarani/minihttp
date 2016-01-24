@@ -8,10 +8,14 @@
 #include <arpa/inet.h>
 #include <string.h>
 
+#include "http.h"
 #include "server.h"
 
 // Number of pending connections
 #define BACKLOG 10
+
+// Size of the recv buffer for each handler
+#define BUFLEN 1024
 
 static void *
 get_in_addr(struct sockaddr *sa)
@@ -90,20 +94,6 @@ server_listen(int sockfd)
 }
 
 void
-server_handle(int fd)
-{
-    char *response = "HTTP/1.1 200 OK\n"
-                     "Content-Length: 40\n"
-                     "Connection: close\n\n"
-                     "<html><body>Hello, world!</body></html>\n";
-
-    if (send(fd, response, strlen(response), 0) == -1)
-        perror("send");
-
-    close(fd);
-}
-
-void
 server_loop(int sockfd)
 {
     struct sockaddr_storage their_addr;
@@ -136,3 +126,31 @@ server_loop(int sockfd)
     }
 }
 
+void
+server_handle(int fd)
+{
+    char buf[BUFLEN];
+    struct http_request req;
+
+    int len = recv(fd, buf, BUFLEN - 1, 0);
+    if (len == -1)
+    {
+        perror("recv");
+        close(fd);
+        return;
+    }
+
+    http_request_parse(buf, len, &req);
+    printf("handler: %s %s %s\n", req.method, req.path, req.version);
+
+    char *response = "HTTP/1.1 200 OK\n"
+                     "Content-Length: 40\n"
+                     "Connection: close\n\n"
+                     "<html><body>Hello, world!</body></html>\n";
+
+    if (send(fd, response, strlen(response), 0) == -1)
+        perror("send");
+
+    http_request_free(&req);
+    close(fd);
+}
