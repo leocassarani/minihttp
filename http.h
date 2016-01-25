@@ -1,7 +1,7 @@
 struct http_request {
     char *method;
     char *path;
-    char *version;
+    char *proto;
     struct http_header *headers;
 };
 

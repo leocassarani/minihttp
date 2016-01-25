@@ -50,7 +50,7 @@ http_request_parse(char *buf, size_t size, struct http_request *req)
 {
     buf = copy_until(buf, " ", &req->method);
     buf = copy_until(buf, " ", &req->path);
-    buf = copy_until(buf, CRLF, &req->version);
+    buf = copy_until(buf, CRLF, &req->proto);
     parse_headers(buf, &req->headers);
 }
 
@@ -59,7 +59,7 @@ http_request_free(struct http_request *req)
 {
     free(req->method);
     free(req->path);
-    free(req->version);
+    free(req->proto);
 
     struct http_header *header = req->headers;
     while (header != NULL)
