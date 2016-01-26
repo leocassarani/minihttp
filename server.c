@@ -143,15 +143,26 @@ server_handle(int fd)
     http_request_parse(buf, len, &req);
     printf("handler: %s %s\n", req.method, req.path);
 
-    char *response = "HTTP/1.1 200 OK\r\n"
-                     "Content-Length: 40\r\n"
-                     "Connection: close\r\n"
-                     "\r\n"
-                     "<html><body>Hello, world!</body></html>\n";
+    struct http_response resp = {
+        .proto  = "HTTP/1.1",
+        .status = "200 OK",
+    };
 
-    if (send(fd, response, strlen(response), 0) == -1)
+    resp.headers = http_headers_add(resp.headers, "Connection", "close");
+    resp.headers = http_headers_add(resp.headers, "Content-Type", "text/html");
+
+    char *body = "<html><body>Hello, world!</body></html>\n";
+    http_response_set_body(&resp, body, strlen(body));
+
+    char out[BUFLEN];
+    memset(out, 0, sizeof out);
+    http_response_str(&resp, out, BUFLEN);
+
+    if (send(fd, out, strlen(out), 0) == -1)
         perror("send");
 
+    http_headers_free(resp.headers);
     http_request_free(&req);
+
     close(fd);
 }

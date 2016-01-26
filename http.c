@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "http.h"
@@ -60,11 +61,57 @@ http_request_free(struct http_request *req)
     free(req->method);
     free(req->path);
     free(req->proto);
+    http_headers_free(req->headers);
+}
 
-    struct http_header *header = req->headers;
+void
+http_response_set_body(struct http_response *resp, char *body, size_t length)
+{
+    resp->body = body;
+    resp->length = length;
+
+    char str[10];
+    snprintf(str, 10, "%zu", length);
+    resp->headers = http_headers_add(resp->headers, "Content-Length", str);
+}
+
+void
+http_response_str(struct http_response *resp, char *buf, size_t length)
+{
+    strcat(buf, resp->proto);
+    strcat(buf, " ");
+    strcat(buf, resp->status);
+    strcat(buf, CRLF);
+
+    for (struct http_header *head = resp->headers; head != NULL; head = head->next)
+    {
+        strcat(buf, head->name);
+        strcat(buf, ": ");
+        strcat(buf, head->value);
+        strcat(buf, CRLF);
+    }
+
+    strcat(buf, CRLF);
+    strcat(buf, resp->body);
+}
+
+struct http_header *
+http_headers_add(struct http_header *headers, char *name, char *value)
+{
+    struct http_header *header = malloc(sizeof(struct http_header));
+    header->name  = strdup(name);
+    header->value = strdup(value);
+    header->next  = headers;
+    return header;
+}
+
+void
+http_headers_free(struct http_header *header)
+{
+    struct http_header *next;
     while (header != NULL)
     {
-        struct http_header *next = header->next;
+        next = header->next;
         free(header->name);
         free(header->value);
         free(header);
