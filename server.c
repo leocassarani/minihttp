@@ -104,7 +104,7 @@ server_loop(int sockfd)
             // Child doesn't need listener socket.
             close(sockfd);
             server_handle(conn_fd, &their_addr);
-            break;
+            exit(0);
         }
 
         // Parent doesn't need the connection socket.
