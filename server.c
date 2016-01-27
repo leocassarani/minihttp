@@ -17,15 +17,6 @@
 // Size of the recv buffer for each handler
 #define BUFLEN 1024
 
-static void *
-get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET)
-        return &(((struct sockaddr_in *) sa)->sin_addr);
-
-    return &(((struct sockaddr_in6 *) sa)->sin6_addr);
-}
-
 int
 server_bind(char *service)
 {
@@ -108,16 +99,11 @@ server_loop(int sockfd)
             continue;
         }
 
-        char s[INET6_ADDRSTRLEN];
-        inet_ntop(their_addr.ss_family,
-                get_in_addr((struct sockaddr *) &their_addr), s, sizeof s);
-        printf("server: got connection from %s\n", s);
-
         if (!fork())
         {
             // Child doesn't need listener socket.
             close(sockfd);
-            server_handle(conn_fd);
+            server_handle(conn_fd, &their_addr);
             break;
         }
 
@@ -126,9 +112,22 @@ server_loop(int sockfd)
     }
 }
 
-void
-server_handle(int fd)
+static void *
+get_in_addr(struct sockaddr *sa)
 {
+    if (sa->sa_family == AF_INET)
+        return &(((struct sockaddr_in *) sa)->sin_addr);
+
+    return &(((struct sockaddr_in6 *) sa)->sin6_addr);
+}
+
+void
+server_handle(int fd, struct sockaddr_storage *addr)
+{
+    char ipaddr[INET6_ADDRSTRLEN];
+    inet_ntop(addr->ss_family,
+            get_in_addr((struct sockaddr *) addr), ipaddr, sizeof ipaddr);
+
     char in[BUFLEN];
     struct http_request req;
 
@@ -141,7 +140,7 @@ server_handle(int fd)
     }
 
     http_request_parse(in, inlen, &req);
-    printf("handler: %s %s\n", req.method, req.path);
+    printf("handler: %s - %s %s\n", ipaddr, req.method, req.path);
 
     struct http_response resp = {
         .proto  = "HTTP/1.1",
