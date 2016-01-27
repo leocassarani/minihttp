@@ -7,9 +7,6 @@
 
 #define CRLF "\r\n"
 
-// Max length of the "Content-Length" header value
-#define MAX_CONTENT_LENGTH_STRLEN 10
-
 static char *
 copy_until(char *buf, char *until, char **out)
 {
@@ -67,12 +64,28 @@ http_request_free(struct http_request *req)
     http_headers_free(req->headers);
 }
 
+static char *
+sizetoa(size_t size)
+{
+    // Find out how many bytes it will take to convert size into a string.
+    // Add 1 for the terminating NULL byte.
+    int len = 1 + snprintf(NULL, 0, "%zu", size);
+
+    // Allocate just enough storage, then call snprintf for real.
+    char *str = malloc(sizeof(char) * len);
+    snprintf(str, len, "%zu", size);
+
+    return str;
+}
+
 static void
 http_response_set_content_length(struct http_response *resp, size_t length)
 {
-    char value[MAX_CONTENT_LENGTH_STRLEN];
-    snprintf(value, MAX_CONTENT_LENGTH_STRLEN, "%zu", length);
-    resp->headers = http_headers_add(resp->headers, "Content-Length", value);
+    // Convert length to a string, then set it as the Content-Length header value.
+    char *str = sizetoa(length);
+    resp->headers = http_headers_add(resp->headers, "Content-Length", str);
+    free(str);
+
     resp->content_length = length;
 }
 
