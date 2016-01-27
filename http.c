@@ -7,6 +7,9 @@
 
 #define CRLF "\r\n"
 
+// Max length of the "Content-Length" header value
+#define MAX_CONTENT_LENGTH_STRLEN 10
+
 static char *
 copy_until(char *buf, char *until, char **out)
 {
@@ -64,15 +67,21 @@ http_request_free(struct http_request *req)
     http_headers_free(req->headers);
 }
 
+static void
+http_response_set_content_length(struct http_response *resp, size_t length)
+{
+    char value[MAX_CONTENT_LENGTH_STRLEN];
+    snprintf(value, MAX_CONTENT_LENGTH_STRLEN, "%zu", length);
+    resp->headers = http_headers_add(resp->headers, "Content-Length", value);
+    resp->content_length = length;
+}
+
 void
 http_response_set_body(struct http_response *resp, char *body, size_t length)
 {
-    resp->body = body;
-    resp->length = length;
-
-    char str[10];
-    snprintf(str, 10, "%zu", length);
-    resp->headers = http_headers_add(resp->headers, "Content-Length", str);
+    resp->body = malloc(length);
+    memcpy(resp->body, body, length);
+    http_response_set_content_length(resp, length);
 }
 
 int
@@ -86,10 +95,23 @@ http_response_str(struct http_response *resp, char *buf, size_t length)
         i += snprintf(buf + i, length - i, "%s: %s%s", head->name, head->value, CRLF);
 
     // \r\n
+    i += snprintf(buf + i, length - i, CRLF);
+
     // Body
-    i += snprintf(buf + i, length - i, "%s%s", CRLF, resp->body);
+    if (length - i >= resp->content_length)
+    {
+        memcpy(buf + i, resp->body, resp->content_length);
+        i += resp->content_length;
+    }
 
     return i;
+}
+
+void
+http_response_free(struct http_response *resp)
+{
+    free(resp->body);
+    http_headers_free(resp->headers);
 }
 
 struct http_header *

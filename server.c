@@ -160,7 +160,7 @@ server_handle(int fd)
     if (send(fd, out, outlen, 0) == -1)
         perror("send");
 
-    http_headers_free(resp.headers);
+    http_response_free(&resp);
     http_request_free(&req);
 
     close(fd);
