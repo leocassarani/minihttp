@@ -29,7 +29,7 @@ parse_headers(char *buf, struct http_header **out)
     struct http_header *prev = NULL;
 
     // Keep parsing headers until we see a line containing only "\r\n".
-    while (strncmp(buf, CRLF, 2) != 0)
+    while (strncmp(buf, CRLF, strlen(CRLF)) != 0)
     {
         struct http_header *header = malloc(sizeof(struct http_header));
         header->next = NULL;
