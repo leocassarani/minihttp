@@ -78,23 +78,16 @@ sizetoa(size_t size)
     return str;
 }
 
-static void
-http_response_set_content_length(struct http_response *resp, size_t length)
+void
+http_response_set_body(struct http_response *resp, char *body, size_t length)
 {
+    resp->body = body;
+    resp->content_length = length;
+
     // Convert length to a string, then set it as the Content-Length header value.
     char *str = sizetoa(length);
     resp->headers = http_headers_add(resp->headers, "Content-Length", str);
     free(str);
-
-    resp->content_length = length;
-}
-
-void
-http_response_set_body(struct http_response *resp, char *body, size_t length)
-{
-    resp->body = malloc(length);
-    memcpy(resp->body, body, length);
-    http_response_set_content_length(resp, length);
 }
 
 int
@@ -123,7 +116,6 @@ http_response_str(struct http_response *resp, char *buf, size_t length)
 void
 http_response_free(struct http_response *resp)
 {
-    free(resp->body);
     http_headers_free(resp->headers);
 }
 
