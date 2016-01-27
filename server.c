@@ -129,18 +129,18 @@ server_loop(int sockfd)
 void
 server_handle(int fd)
 {
-    char buf[BUFLEN];
+    char in[BUFLEN];
     struct http_request req;
 
-    int len = recv(fd, buf, BUFLEN - 1, 0);
-    if (len == -1)
+    int inlen = recv(fd, in, BUFLEN - 1, 0);
+    if (inlen == -1)
     {
         perror("recv");
         close(fd);
         return;
     }
 
-    http_request_parse(buf, len, &req);
+    http_request_parse(in, inlen, &req);
     printf("handler: %s %s\n", req.method, req.path);
 
     struct http_response resp = {
@@ -155,10 +155,9 @@ server_handle(int fd)
     http_response_set_body(&resp, body, strlen(body));
 
     char out[BUFLEN];
-    memset(out, 0, sizeof out);
-    http_response_str(&resp, out, BUFLEN);
+    int outlen = http_response_str(&resp, out, BUFLEN);
 
-    if (send(fd, out, strlen(out), 0) == -1)
+    if (send(fd, out, outlen, 0) == -1)
         perror("send");
 
     http_headers_free(resp.headers);

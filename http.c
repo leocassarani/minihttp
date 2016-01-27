@@ -43,7 +43,7 @@ parse_headers(char *buf, struct http_header **out)
         }
     }
 
-    return buf + 2; // Add 2 for the final "\r\n"
+    return buf + strlen(CRLF);
 }
 
 void
@@ -75,24 +75,21 @@ http_response_set_body(struct http_response *resp, char *body, size_t length)
     resp->headers = http_headers_add(resp->headers, "Content-Length", str);
 }
 
-void
+int
 http_response_str(struct http_response *resp, char *buf, size_t length)
 {
-    strcat(buf, resp->proto);
-    strcat(buf, " ");
-    strcat(buf, resp->status);
-    strcat(buf, CRLF);
+    // HTTP/1.1 200 OK\r\n
+    int i = snprintf(buf, length, "%s %s%s", resp->proto, resp->status, CRLF);
 
+    // Header: Value\r\n
     for (struct http_header *head = resp->headers; head != NULL; head = head->next)
-    {
-        strcat(buf, head->name);
-        strcat(buf, ": ");
-        strcat(buf, head->value);
-        strcat(buf, CRLF);
-    }
+        i += snprintf(buf + i, length - i, "%s: %s%s", head->name, head->value, CRLF);
 
-    strcat(buf, CRLF);
-    strcat(buf, resp->body);
+    // \r\n
+    // Body
+    i += snprintf(buf + i, length - i, "%s%s", CRLF, resp->body);
+
+    return i;
 }
 
 struct http_header *

@@ -23,7 +23,7 @@ void http_request_parse(char *, size_t, struct http_request *);
 void http_request_free(struct http_request *);
 
 void http_response_set_body(struct http_response *, char *, size_t);
-void http_response_str(struct http_response *, char *, size_t);
+int http_response_str(struct http_response *, char *, size_t);
 
 struct http_header *http_headers_add(struct http_header *, char *, char *);
 void http_headers_free(struct http_header *);
