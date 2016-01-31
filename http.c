@@ -91,10 +91,16 @@ http_response_set_body(struct http_response *resp, char *body, size_t length)
 }
 
 int
-http_response_str(struct http_response *resp, char *buf, size_t length)
+http_response_status_line(struct http_response *resp, char *buf, size_t length)
 {
     // HTTP/1.1 200 OK\r\n
-    int i = snprintf(buf, length, "%s %s%s", resp->proto, resp->status, CRLF);
+    return snprintf(buf, length, "%s %s%s", resp->proto, resp->status, CRLF);
+}
+
+int
+http_response_headers(struct http_response *resp, char *buf, size_t length)
+{
+    int i = 0;
 
     // Header: Value\r\n
     for (struct http_header *head = resp->headers; head != NULL; head = head->next)
@@ -102,13 +108,6 @@ http_response_str(struct http_response *resp, char *buf, size_t length)
 
     // \r\n
     i += snprintf(buf + i, length - i, CRLF);
-
-    // Body
-    if (length - i >= resp->content_length)
-    {
-        memcpy(buf + i, resp->body, resp->content_length);
-        i += resp->content_length;
-    }
 
     return i;
 }

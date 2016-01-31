@@ -154,9 +154,12 @@ server_handle(int fd, struct sockaddr_storage *addr)
     http_response_set_body(&resp, body, strlen(body));
 
     char out[BUFLEN];
-    int outlen = http_response_str(&resp, out, BUFLEN);
 
-    if (send(fd, out, outlen, 0) == -1)
+    int outlen = http_response_status_line(&resp, out, BUFLEN);
+    outlen += http_response_headers(&resp, out + outlen, BUFLEN - outlen);
+
+    if (send(fd, out, outlen, 0) == -1 ||
+        send(fd, resp.body, resp.content_length, 0) == -1)
         perror("send");
 
     http_response_free(&resp);
