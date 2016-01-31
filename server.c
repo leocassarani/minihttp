@@ -121,6 +121,19 @@ get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6 *) sa)->sin6_addr);
 }
 
+static void
+handle_request(struct http_request *req, struct http_response *resp)
+{
+    resp->proto  = "HTTP/1.1";
+    resp->status = "200 OK";
+
+    resp->headers = http_headers_add(resp->headers, "Connection", "close");
+    resp->headers = http_headers_add(resp->headers, "Content-Type", "text/html");
+
+    char *body = strdup("<html><body>Hello, world!</body></html>\n");
+    http_response_set_body(resp, body, strlen(body));
+}
+
 void
 server_handle(int fd, struct sockaddr_storage *addr)
 {
@@ -129,8 +142,6 @@ server_handle(int fd, struct sockaddr_storage *addr)
             get_in_addr((struct sockaddr *) addr), ipaddr, sizeof ipaddr);
 
     char in[BUFLEN];
-    struct http_request req;
-
     int inlen = recv(fd, in, BUFLEN - 1, 0);
     if (inlen == -1)
     {
@@ -139,22 +150,17 @@ server_handle(int fd, struct sockaddr_storage *addr)
         return;
     }
 
+    struct http_request req;
     http_request_parse(in, inlen, &req);
+
     printf("handler: %s - %s %s\n", ipaddr, req.method, req.path);
 
-    struct http_response resp = {
-        .proto  = "HTTP/1.1",
-        .status = "200 OK",
-    };
+    struct http_response resp;
+    memset(&resp, 0, sizeof(struct http_response));
 
-    resp.headers = http_headers_add(resp.headers, "Connection", "close");
-    resp.headers = http_headers_add(resp.headers, "Content-Type", "text/html");
-
-    char *body = "<html><body>Hello, world!</body></html>\n";
-    http_response_set_body(&resp, body, strlen(body));
+    handle_request(&req, &resp);
 
     char out[BUFLEN];
-
     int outlen = http_response_status_line(&resp, out, BUFLEN);
     outlen += http_response_headers(&resp, out + outlen, BUFLEN - outlen);
 
@@ -162,6 +168,7 @@ server_handle(int fd, struct sockaddr_storage *addr)
         send(fd, resp.body, resp.content_length, 0) == -1)
         perror("send");
 
+    free(resp.body);
     http_response_free(&resp);
     http_request_free(&req);
 
