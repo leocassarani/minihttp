@@ -1,4 +1,10 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "handler.h"
 #include "http.h"
@@ -14,8 +20,50 @@ handle_not_implemented(struct http_response *resp)
 }
 
 static void
+handle_not_found(struct http_response *resp)
+{
+    resp->status = "404 Not Found";
+    resp->headers = http_headers_add(resp->headers, "Content-Type", "text/html");
+
+    char *body = strdup("<html><body>Not Found</body></html>\n");
+    http_response_set_body(resp, body, strlen(body));
+}
+
+static char *
+file_path_join(char *relpath)
+{
+    // NULL, 0 asks getcwd to malloc() the right amount of memory
+    char *cwd = getcwd(NULL, 0);
+    size_t len = strlen(cwd) + strlen(relpath) + 1; // Add 1 for the NULL byte
+    char *fullpath = realloc(cwd, len * sizeof(char));
+    return strcat(fullpath, relpath);
+}
+
+static bool
+file_exists(char *filepath)
+{
+    struct stat buf;
+
+    // Return false if anything goes wrong while looking for the file.
+    if (lstat(filepath, &buf) == -1)
+        return false;
+
+    // Return true if filepath points to a regular file, false otherwise.
+    return S_ISREG(buf.st_mode);
+}
+
+static void
 handle_get(struct http_request *req, struct http_response *resp)
 {
+    char *fullpath = file_path_join(req->path);
+    if (!file_exists(fullpath))
+    {
+        handle_not_found(resp);
+        free(fullpath);
+        return;
+    }
+    free(fullpath);
+
     resp->status = "200 OK";
     resp->headers = http_headers_add(resp->headers, "Content-Type", "text/html");
 
