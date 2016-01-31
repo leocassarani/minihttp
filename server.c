@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 
+#include "handler.h"
 #include "http.h"
 #include "server.h"
 
@@ -119,19 +120,6 @@ get_in_addr(struct sockaddr *sa)
         return &(((struct sockaddr_in *) sa)->sin_addr);
 
     return &(((struct sockaddr_in6 *) sa)->sin6_addr);
-}
-
-static void
-handle_request(struct http_request *req, struct http_response *resp)
-{
-    resp->proto  = "HTTP/1.1";
-    resp->status = "200 OK";
-
-    resp->headers = http_headers_add(resp->headers, "Connection", "close");
-    resp->headers = http_headers_add(resp->headers, "Content-Type", "text/html");
-
-    char *body = strdup("<html><body>Hello, world!</body></html>\n");
-    http_response_set_body(resp, body, strlen(body));
 }
 
 void

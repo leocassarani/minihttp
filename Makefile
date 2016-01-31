@@ -1,6 +1,9 @@
-bin/http: *.c *.h
+SRCS=$(wildcard *.c)
+HEAD=$(wildcard *.h)
+
+bin/http: $(SRCS) $(HEAD)
 	mkdir -p bin
-	gcc -std=gnu99 -Wall http.c main.c server.c -o bin/http
+	gcc -std=gnu99 -Wall $(SRCS) -o bin/http
 
 clean:
 	rm -f bin/http
