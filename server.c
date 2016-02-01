@@ -130,7 +130,7 @@ server_handle(int fd, struct sockaddr_storage *addr)
             get_in_addr((struct sockaddr *) addr), ipaddr, sizeof ipaddr);
 
     char in[BUFLEN];
-    int inlen = recv(fd, in, BUFLEN - 1, 0);
+    int inlen = recv(fd, in, BUFLEN, 0);
     if (inlen == -1)
     {
         perror("recv");

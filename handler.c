@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,42 +40,48 @@ file_path_join(char *relpath)
     return strcat(fullpath, relpath);
 }
 
-static bool
-file_exists(char *filepath)
-{
-    struct stat buf;
-
-    // Return false if anything goes wrong while looking for the file.
-    if (lstat(filepath, &buf) == -1)
-        return false;
-
-    // Return true if filepath points to a regular file, false otherwise.
-    return S_ISREG(buf.st_mode);
-}
-
 static void
 handle_get(struct http_request *req, struct http_response *resp)
 {
     char *fullpath = file_path_join(req->path);
-    if (!file_exists(fullpath))
+    struct stat filestat;
+
+    // Return 404 Not Found if the file doesn't exist or is a directory.
+    if (lstat(fullpath, &filestat) == -1 || !S_ISREG(filestat.st_mode))
     {
         handle_not_found(resp);
         free(fullpath);
         return;
     }
+
+    FILE *file = fopen(fullpath, "r");
     free(fullpath);
 
-    resp->status = "200 OK";
-    resp->headers = http_headers_add(resp->headers, "Content-Type", "text/html");
+    if (NULL == file)
+    {
+        perror("fopen");
+        handle_not_found(resp);
+        return;
+    }
 
-    char *body = strdup("<html><body>Hello, world!</body></html>\n");
-    http_response_set_body(resp, body, strlen(body));
+    size_t len = filestat.st_size;
+    char *buf = malloc(len);
+
+    if (fread(buf, len, 1, file) == 0)
+        perror("fread");
+
+    if (fclose(file) == EOF)
+        perror("fclose");
+
+    resp->status = "200 OK";
+    resp->headers = http_headers_add(resp->headers, "Content-Type", "text/plain");
+    http_response_set_body(resp, buf, len);
 }
 
 void
 handle_request(struct http_request *req, struct http_response *resp)
 {
-    resp->proto   = "HTTP/1.1";
+    resp->proto = "HTTP/1.1";
     resp->headers = http_headers_add(resp->headers, "Connection", "close");
 
     if (strcmp(req->method, "GET") == 0)
