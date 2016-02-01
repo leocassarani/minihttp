@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 
 #include "handler.h"
@@ -54,12 +53,12 @@ handle_get(struct http_request *req, struct http_response *resp)
         return;
     }
 
-    FILE *file = fopen(fullpath, "r");
+    int file = open(fullpath, O_RDONLY);
     free(fullpath);
 
-    if (NULL == file)
+    if (-1 == file)
     {
-        perror("fopen");
+        perror("open");
         handle_not_found(resp);
         return;
     }
@@ -67,11 +66,11 @@ handle_get(struct http_request *req, struct http_response *resp)
     size_t len = filestat.st_size;
     char *buf = malloc(len);
 
-    if (fread(buf, len, 1, file) == 0)
-        perror("fread");
+    if (read(file, buf, len) == -1)
+        perror("read");
 
-    if (fclose(file) == EOF)
-        perror("fclose");
+    if (close(file) == -1)
+        perror("close");
 
     resp->status = "200 OK";
     resp->headers = http_headers_add(resp->headers, "Content-Type", "text/plain");
