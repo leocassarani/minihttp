@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include <string.h>
 
 #include "handler.h"
 #include "http.h"
@@ -85,9 +87,68 @@ server_listen(int sockfd)
     printf("server: waiting for connections...\n");
 }
 
+struct worker_args {
+    int count;
+    int fd;
+    struct sockaddr_storage *addr;
+};
+
+static struct worker_args *
+worker_args_new(int count, int fd, struct sockaddr_storage *addr)
+{
+    struct worker_args *args = malloc(sizeof(struct worker_args));
+    args->count = count;
+    args->fd = fd;
+    args->addr = addr;
+    return args;
+}
+
+static void *
+worker_start(void *args_)
+{
+    struct worker_args *args = (struct worker_args *) args_;
+    server_handle(args->count, args->fd, args->addr);
+    free(args_);
+    return NULL;
+}
+
+#define handle_error_en(en, msg) \
+    do { errno = en, perror(msg); return; } while(0)
+
+static void
+worker_spawn(int count, int fd, struct sockaddr_storage *addr)
+{
+    pthread_t thread;
+    pthread_attr_t attr;
+    int retval;
+
+    retval = pthread_attr_init(&attr);
+    if (retval != 0)
+        handle_error_en(retval, "pthread_attr_init");
+
+    retval = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (retval != 0)
+        handle_error_en(retval, "pthread_attr_setdetachstate");
+
+    // The thread will be responsible for calling free() on the memory for args.
+    struct worker_args *args = worker_args_new(count, fd, addr);
+
+    retval = pthread_create(&thread, &attr, worker_start, args);
+    if (retval != 0)
+    {
+        free(args);
+        handle_error_en(retval, "pthread_create");
+    }
+
+    retval = pthread_attr_destroy(&attr);
+    if (retval != 0)
+        handle_error_en(retval, "pthread_attr_destroy");
+}
+
 void
 server_loop(int sockfd)
 {
+    int thread_count = 0;
     struct sockaddr_storage their_addr;
     socklen_t sin_size = sizeof their_addr;
 
@@ -100,16 +161,7 @@ server_loop(int sockfd)
             continue;
         }
 
-        if (!fork())
-        {
-            // Child doesn't need listener socket.
-            close(sockfd);
-            server_handle(conn_fd, &their_addr);
-            exit(0);
-        }
-
-        // Parent doesn't need the connection socket.
-        close(conn_fd);
+        worker_spawn(++thread_count, conn_fd, &their_addr);
     }
 }
 
@@ -123,7 +175,7 @@ get_in_addr(struct sockaddr *sa)
 }
 
 void
-server_handle(int fd, struct sockaddr_storage *addr)
+server_handle(int count, int fd, struct sockaddr_storage *addr)
 {
     char ipaddr[INET6_ADDRSTRLEN];
     inet_ntop(addr->ss_family,
@@ -141,7 +193,7 @@ server_handle(int fd, struct sockaddr_storage *addr)
     struct http_request req;
     http_request_parse(in, inlen, &req);
 
-    printf("handler: %s - %s %s\n", ipaddr, req.method, req.path);
+    printf("handler[%d]: %s - %s %s\n", count, ipaddr, req.method, req.path);
 
     struct http_response resp;
     memset(&resp, 0, sizeof(struct http_response));
