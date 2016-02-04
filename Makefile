@@ -3,7 +3,7 @@ HEAD=$(wildcard *.h)
 
 bin/http: $(SRCS) $(HEAD)
 	mkdir -p bin
-	gcc -std=gnu99 -Wall -pthread $(SRCS) -o bin/http
+	gcc -std=gnu99 -pedantic -Wall -pthread $(SRCS) -o bin/http
 
 clean:
 	rm -f bin/http
